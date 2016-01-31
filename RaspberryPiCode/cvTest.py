@@ -4,9 +4,26 @@ from picamera import PiCamera
 import time
 import cv2
 import numpy as np
+import sys
+import time
+from networktables import NetworkTable
+
+if len(sys.argv) < 2:
+    print("Error: specify an IP to connect to!")
+    print("Going with default: ")
+    ip = "roboRIO-1262-FRC.local"
+    print(ip)
+else:
+    ip = sys.argv[1]
+
+NetworkTable.setIPAddress(ip)
+NetworkTable.setClientMode()
+NetworkTable.initialize()
+
+sd = NetworkTable.getTable("RaspberryPI")
 
 #resolution of the webcam
-width, height = 640, 480
+width, height = 320, 240
  
 # initialize the camera and grab a reference to the raw camera capture
 camera = PiCamera()
@@ -62,9 +79,13 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
         if cnt != 'no contours':
                 x, y = findCenterXY(cnt)
                 cv2.circle(image, (x, y), 5, (255, 0,0), cv2.FILLED) #draws point in middle of contour
-                print "x: ", x , "y: ", y
+                #print "x: ", x , "y: ", y
+                sd.putNumber("x", x)
+                sd.putNumber("y", y)
+                sd.putBoolean("contourFound", True)
         else:
-                print "no contours"
+                sd.putBoolean("contourFound", False)
+                #print "no contours"
                         
 	# show the frame
 	cv2.imshow("Frame", image)
