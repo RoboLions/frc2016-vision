@@ -1,6 +1,6 @@
 # import the necessary packages
-from picamera.array import PiRGBArray
-from picamera import PiCamera
+#from picamera.array import PiRGBArray
+#from picamera import PiCamera
 import time
 import cv2
 import numpy as np
@@ -26,12 +26,15 @@ sd = NetworkTable.getTable("RaspberryPI")
 width, height = 320, 240
  
 # initialize the camera and grab a reference to the raw camera capture
-camera = PiCamera()
-camera.resolution = (width, height)
-rawCapture = PiRGBArray(camera, size=(width, height))
+#camera = PiCamera()
+#camera.resolution = (width, height)
+#rawCapture = PiRGBArray(camera, size=(width, height))
  
 # allow the camera to warmup
-time.sleep(0.1)
+#time.sleep(0.1)
+cap = cv2.VideoCapture(0);
+cap.set(3, width)
+cap.set(4, height)
 
 def findBiggestContour(contours):
         tempArea = 0
@@ -53,16 +56,17 @@ def findCenterXY(cnt):
         return x, y
 
 # capture frames from the camera
-for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+#for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+while True:
 	# grab the raw NumPy array representing the image, then initialize the timestamp
 	# and occupied/unoccupied text
-	image = frame.array
-
+	#image = frame.array
+        _, image = cap.read()
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         #Lower and upper bounds for the H, S, V values respectivley
-        lowerYellow = np.array([26, 99, 154])
-        upperYellow = np.array([51, 255, 255])
+        lowerYellow = np.array([66, 30, 155])
+        upperYellow = np.array([114, 255, 255])
 
         imgThresh = cv2.inRange(hsv, lowerYellow, upperYellow)
 
@@ -79,13 +83,13 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
         if cnt != 'no contours':
                 x, y = findCenterXY(cnt)
                 cv2.circle(image, (x, y), 5, (255, 0,0), cv2.FILLED) #draws point in middle of contour
-                #print "x: ", x , "y: ", y
+                print "x: ", x , "y: ", y
                 sd.putNumber("x", x)
                 sd.putNumber("y", y)
                 sd.putBoolean("contourFound", True)
         else:
                 sd.putBoolean("contourFound", False)
-                #print "no contours"
+                print "no contours"
                         
 	# show the frame
 	cv2.imshow("Frame", image)
@@ -93,7 +97,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 	key = cv2.waitKey(1) & 0xFF
  
 	# clear the stream in preparation for the next frame
-	rawCapture.truncate(0)
+	#rawCapture.truncate(0)
  
 	# if the `esc` key was pressed, break from the loop
 	if key == 27:
