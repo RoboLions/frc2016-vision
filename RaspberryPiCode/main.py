@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # import the necessary packages
 #from picamera.array import PiRGBArray
 #from picamera import PiCamera
@@ -11,6 +13,7 @@ from networktables import NetworkTable
 import subprocess
 
 subprocess.call(["v4l2-ctl", "-d" ,"/dev/video0", "-c", "exposure_auto=1", "-c", "exposure_absolute=9"])
+subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n video.jpg -r", "-o", "/usr/local/lib/output_http.so -w /usr/local/www -p 1180"])
 
 if len(sys.argv) < 2:
     print("Error: specify an IP to connect to!")
@@ -69,7 +72,7 @@ def main():
     _, image = cap.read()
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    #Lower and upper bounds for the H, S, V values respectivley
+    #Lower and upper bounds for the H, S, V values respectively
     lower = np.array([61, 65, 60])
     upper = np.array([102, 255, 255])
 
@@ -104,8 +107,11 @@ def main():
 
 
     # show the frame
-    cv2.imshow("Frame", image)
+    #cv2.imshow("Frame", image)
 
+    # writes the frames to a file to be read by the mjpeg streamer
+    cv2.imwrite("/home/pi/Desktop/frc2016-vision/RaspberryPiCode/video.jpg", image)
+    
 while True:
     main()
     key = cv2.waitKey(1) & 0xFF
