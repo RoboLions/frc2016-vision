@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-# import the necessary packages
-#from picamera.array import PiRGBArray
-#from picamera import PiCamera
+#Author: THE GREAT PAPYRUS (Nyeh heh heh)
 import time
 import cv2
 import numpy as np
@@ -12,7 +10,28 @@ import timeit
 from networktables import NetworkTable
 import subprocess
 
-subprocess.call(["v4l2-ctl", "-d" ,"/dev/video0", "-c", "exposure_auto=1", "-c", "exposure_absolute=9"])
+# resolution of the webcam
+width, height = 320, 240
+
+#Lower and upper bounds for the H, S, V values respectively
+minHue = 61
+minSaturation = 100
+minValue = 60
+
+maxHue = 102
+maxSaturation = 255
+maxValue = 255
+
+lowerHSV = np.array([minHue, minSaturation, minValue])
+upperHSV = np.array([maxHue, maxSaturation, maxValue])
+
+# The index of the contours in the tuple returned from the findContours method
+contourIndex = 1
+
+
+# This subproccess runs the command, basically setting the exposure so it's not automatic, drastically reducing the performance.
+subprocess.call(["v4l2-ctl", "-d" ,"/dev/video0", "-c", "exposure_auto=1", "-c", "exposure_absolute=10"]) # exposure_absolute sets the exposure
+# This subprocess runs the command, to run the mjpg streamer for driver station
 subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n video.jpg -r", "-o", "/usr/local/lib/output_http.so -w /usr/local/www -p 1180"])
 
 if len(sys.argv) < 2:
@@ -29,74 +48,94 @@ NetworkTable.initialize()
 
 sd = NetworkTable.getTable("RaspberryPI")
 
-#resolution of the webcam
-#width, height = 640, 360
-#width, height = 427, 240
-width, height = 320, 240 #3.76315808296 #FPS: 26.5734252443
-#width, height = 256, 144 #3.61019802094 #FPS: 27.6993116222
-
-# allow the camera to warmup
-#time.sleep(0.1)
-cap = cv2.VideoCapture(0);
-cap.set(3, width)
-cap.set(4, height)
-
 sd.putNumber("imageSizeX", width)
 sd.putNumber("imageSizeY", height)
 
-def findCenterXY(cnt):
-        '''returns center x, y values'''
-        M = cv2.moments(cnt)
-        x = int(M['m10']/M['m00'])
-        y = int(M['m01']/M['m00'])
 
-        return x, y
+# sets the video feed to cap, short for capture
+cap = cv2.VideoCapture(0);
 
-def filterContours(cntrs):
-    if len(cntrs) > 0:
-        cnt = cntrs[0]
+# The 3 and 4 are majick numbers that are determine the parameter being changed is width and height, respectively
+cap.set(3, width) # Changes the width of the feed
+cap.set(4, height) # Changes the height of the feed
 
-        area = cv2.contourArea(cnt)
-        hull = cv2.convexHull(cnt)
-        hull_area = cv2.contourArea(hull)
-        if hull_area > 0:
-            solidity = float(area)/hull_area
-            if 0.25 < solidity and solidity < 0.45:
-                return cnt
-    cnt = "no contours"        
-    return cnt
+def getBestContour(cntrs):
+    ''' This method takes in a list of contours and returns the best contour to track, based on solidity. If no contour is present it returns None '''
+    if len(cntrs) == 0:
+        return None
+    
+    cnt = cntrs[0]
+    area = cv2.contourArea(cnt)
+    hull = cv2.convexHull(cnt)
+    hull_area = cv2.contourArea(hull)
+    
+    if hull_area > 0:
+        targetSolidity = 0.35
+        solidityTolerance = 0.1
 
-# capture frames from the camera
-#for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        minSolidity = targetSolidity - solidityTolerance
+        maxSolidity = targetSolidity + solidityTolerance
+        
+        solidity = float(area)/hull_area
+        
+        if minSolidity < solidity and solidity < maxSolidity:
+            return cnt
+
+    return None
+
 def main():
-    _, image = cap.read()
+    # captureSuccess is true if the camera was read properly
+    # image is the image read from the camera
+    captureSuccess, image = cap.read()
+    
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    #Lower and upper bounds for the H, S, V values respectively
-    lower = np.array([61, 65, 60])
-    upper = np.array([102, 255, 255])
+    # Creates a image Threshold based on the lower and upper bounds on HSV values
+    imgThresh = cv2.inRange(hsv, lowerHSV, upperHSV)
 
-    imgThresh = cv2.inRange(hsv, lower, upper)
+    #imgThresh = cv2.GaussianBlur(imgThresh, (3,3), 2)
+    #imgThresh = cv2.dilate(imgThresh, np.ones((5,5),np.uint8))
+    #imgThresh = cv2.erode(imgThresh, np.ones((5,5),np.uint8))
 
-    imgThresh = cv2.GaussianBlur(imgThresh, (3,3), 2)
-    imgThresh = cv2.dilate(imgThresh, np.ones((5,5),np.uint8))
-    imgThresh = cv2.erode(imgThresh, np.ones((5,5),np.uint8))
+    # We really don't need to use im2 and hierarchy variables, just ignore these for now
+    contours = cv2.findContours(imgThresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[contourIndex]
+    
+    #sorts the contour from bigges to smallest
+    sortedContours = sorted(contours, key = cv2.contourArea, reverse=True)
 
-    _,contours, _ = cv2.findContours(imgThresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    #find biggest contour
-    cntrs = sorted(contours, key = cv2.contourArea, reverse=True)
+    bestContour = getBestContour(sortedContours)
 
+    if bestContour != None:
+        #x, y = findCenterXY(cnt)
+        rect = cv2.minAreaRect(bestContour)
 
-    cnt = filterContours(cntrs)
+        # Finds the points of the minimum rotated rectangle
+        # Box is just a list of points (numpy.ndarray)
+        box = cv2.boxPoints(rect)
 
-    if cnt != "no contours":
-        x, y = findCenterXY(cnt)
-        cv2.drawContours(image, cnt, -1, (0, 0, 255), 3)
-        cv2.circle(image, (x, y), 5, (0, 0, 255), cv2.FILLED) #draws point in middle of contour
-        print "x: ", x , "y: ", y
-        sd.putNumber("x", x)
-        sd.putNumber("y", y)
-        sd.putNumber("area", cv2.contourArea(cnt))
+        # Finds the lengths of the two sides of the rectangle
+        dist1 = np.linalg.norm(box[1] - box[2])
+        dist2 = np.linalg.norm(box[2] - box[3])
+
+        # Compares which distance is greater, and then assigns the mid point of the longer side as the targetPoint
+        if dist1 >= dist2:
+            targetPoint = (box[1] + box[2]) / 2
+        else:
+            targetPoint = (box[2] + box[3]) / 2
+        
+        box = np.int0(box)
+
+        targetPoint = tuple(targetPoint)
+
+        # Draws the rotated rectangle in blue
+        cv2.drawContours(image, [box], 0, (255, 0, 0), 2)
+        #draws point in middle of contour in Red
+        cv2.circle(image, targetPoint, 5, (0, 0, 255), cv2.FILLED)
+
+        print "(%d, %d)" % targetPoint
+        sd.putNumber("x", targetPoint[0])
+        sd.putNumber("y", targetPoint[1])
+        sd.putNumber("area", cv2.contourArea(bestContour))
         sd.putBoolean("contourFound", True)
     else:
         print "no contours"
@@ -104,10 +143,8 @@ def main():
 
 
 
-
-
     # show the frame
-    #cv2.imshow("Frame", image)
+    cv2.imshow("Frame", image)
 
     # writes the frames to a file to be read by the mjpeg streamer
     cv2.imwrite("/home/pi/Desktop/frc2016-vision/RaspberryPiCode/video.jpg", image)
