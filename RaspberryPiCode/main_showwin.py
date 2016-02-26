@@ -12,6 +12,7 @@ import subprocess
 
 # resolution of the webcam
 width, height = 320, 240
+display_size = (640, 480)
 
 #Lower and upper bounds for the H, S, V values respectively
 minHue = 60
@@ -144,7 +145,8 @@ def main():
 
 
     # show the frame
-    # cv2.imshow("Frame", image)
+    display_image = cv2.resize(image, display_size)
+    cv2.imshow("Frame", display_image)
 
     # writes the frames to a file to be read by the mjpeg streamer
     cv2.imwrite("/home/pi/Desktop/frc2016-vision/RaspberryPiCode/video.jpg", image)
