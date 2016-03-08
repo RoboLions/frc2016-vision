@@ -9,6 +9,7 @@ import time
 import timeit
 from networktables import NetworkTable
 import subprocess
+from operator import itemgetter
 
 # resolution of the webcam
 width, height = 320, 240
@@ -82,6 +83,13 @@ def getBestContour(cntrs):
             return cnt
 
     return None
+    
+# GOT this calcualtions from GOOGLE DRIVE: https://docs.google.com/a/prhsrobotics.com/spreadsheets/d/1j2z3Uly7T2C6El34SFLA19RGCt04RwKtTRwmxWzCv3Q/edit?usp=sharing
+# Takes in the area of a contour and calculates the x and y offsets
+def calculateXOffset(area):
+    return max(0, 0.052 * area - 17.496)
+def calculateYOffset(area):
+    return min(0, 0.099*area - 81.217)    
 
 def main():
     # captureSuccess is true if the camera was read properly
@@ -112,34 +120,44 @@ def main():
         # Finds the points of the minimum rotated rectangle
         # Box is just a list of points (numpy.ndarray)
         box = cv2.boxPoints(rect)
-
-        # Finds the lengths of the two sides of the rectangle
-        dist1 = np.linalg.norm(box[1] - box[2])
-        dist2 = np.linalg.norm(box[2] - box[3])
-
-        # Compares which distance is greater, and then assigns the mid point of the longer side as the targetPoint
-        if dist1 >= dist2:
-            targetPoint = (box[1] + box[2]) / 2
-        else:
-            targetPoint = (box[2] + box[3]) / 2
+        
+        # A list of the Box points sorted by lowest y values, to find the top line of the box
+        sortedBoxPoints = sorted(box, key = itemgetter(1))
         
         box = np.int0(box)
-
-        targetPoint = tuple(targetPoint)
+        
+        #center of the contour
+        centerPoint = (sortedBoxPoints[0] + sortedBoxPoints[1]) / 2
+        centerPoint = tuple(centerPoint)
+        
+        area = cv2.contourArea(bestContour)
+        
+        offset = (calculateXOffset(area), calculateYOffset(area))
+        
+        targetPoint = tuple(map(int, map(sum, zip(centerPoint, offset))))
 
         # Draws the rotated rectangle in blue
         cv2.drawContours(image, [box], 0, (255, 0, 0), 2)
-        #draws point in middle of contour in Red
-        cv2.circle(image, targetPoint, 5, (0, 0, 255), cv2.FILLED)
+        #draws point in middle of contour in yellow
+        cv2.circle(image, centerPoint, 5, (0, 255, 255), cv2.FILLED)
+        
+        #draws targetPoint in Orange
+        cv2.circle(image, targetPoint, 5, (0, 180, 255), cv2.FILLED)
+        
+        
 
         print "(%d, %d)" % targetPoint
         sd.putNumber("x", targetPoint[0])
         sd.putNumber("y", targetPoint[1])
-        sd.putNumber("area", cv2.contourArea(bestContour))
+        sd.putNumber("area", area)
         sd.putBoolean("contourFound", True)
     else:
         print "no contours"
         sd.putBoolean("contourFound", False)
+        
+    # Center Cirle in Yellow
+    cv2.circle(image, (width/2, height/2), 10, (0, 0, 255), 1)
+
 
 
 
