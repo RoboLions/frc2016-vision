@@ -18,11 +18,11 @@ width, height = 320, 240
 targetingDots = [(165, 187), (143, 162), (143, 134)]
 
 #Lower and upper bounds for the H, S, V values respectively
-minHue = 30
-minSaturation = 75
-minValue = 60
+minHue = 55
+minSaturation = 44
+minValue = 138
 
-maxHue = 100
+maxHue = 92
 maxSaturation = 255
 maxValue = 255
 
@@ -75,9 +75,7 @@ def getBestContour(cntrs):
     
     if hull_area > 0:
         targetSolidity = 0.35
-        solidityTolerance = 0.2
-        # targetSolidity = 0.5
-        # solidityTolerance = 0.5
+        solidityTolerance = 0.1
 
         minSolidity = targetSolidity - solidityTolerance
         maxSolidity = targetSolidity + solidityTolerance
