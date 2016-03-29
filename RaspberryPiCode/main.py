@@ -94,6 +94,10 @@ def calculateXOffset(area):
 def calculateYOffset(area):
     return min(0, 0.0196113 * area - 81.217)
 
+def drawTargetingDots(image):
+    for point in targetingDots:
+        cv2.circle(image, point, 5, (0, 0, 255), cv2.FILLED)
+
 def main():
     # captureSuccess is true if the camera was read properly
     # image is the image read from the camera
@@ -115,9 +119,6 @@ def main():
     sortedContours = sorted(contours, key = cv2.contourArea, reverse=True)
 
     bestContour = getBestContour(sortedContours)
-
-    for point in targetingDots:
-        cv2.circle(image, point, 5, (0, 0, 255), cv2.FILLED)
 
     if bestContour != None:
         #x, y = findCenterXY(cnt)
@@ -153,8 +154,6 @@ def main():
         #draws estimatedShotPoint in Orange
         cv2.circle(image, estimatedShotPoint, 5, (0, 180, 255), cv2.FILLED)
         
-        
-
         # print "(%d, %d)" % targetPoint
         sd.putNumber("x", targetPoint[0])
         sd.putNumber("y", targetPoint[1])
@@ -167,8 +166,7 @@ def main():
     # Center Cirle in Yellow
     cv2.circle(image, (width/2, height/2), 10, (0, 0, 255), 1)
 
-
-
+    drawTargetingDots(image)
 
     # show the frame
     # cv2.imshow("Frame", image)
