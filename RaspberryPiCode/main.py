@@ -14,9 +14,12 @@ from operator import itemgetter
 # resolution of the webcam
 width, height = 320, 240
 
+# targeting dots
+targetingDots = [(165, 187), (143, 162), (143, 134)]
+
 #Lower and upper bounds for the H, S, V values respectively
-minHue = 60
-minSaturation = 100
+minHue = 30
+minSaturation = 75
 minValue = 60
 
 maxHue = 100
@@ -38,7 +41,7 @@ subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n v
 if len(sys.argv) < 2:
     print("Error: specify an IP to connect to!")
     print("Going with default: ")
-    ip = "roboRIO-1262-FRC.local"
+    ip = "roboRIO-1261-FRC.local"
     print(ip)
 else:
     ip = sys.argv[1]
@@ -72,7 +75,9 @@ def getBestContour(cntrs):
     
     if hull_area > 0:
         targetSolidity = 0.35
-        solidityTolerance = 0.1
+        solidityTolerance = 0.2
+        # targetSolidity = 0.5
+        # solidityTolerance = 0.5
 
         minSolidity = targetSolidity - solidityTolerance
         maxSolidity = targetSolidity + solidityTolerance
@@ -87,9 +92,9 @@ def getBestContour(cntrs):
 # GOT this calcualtions from GOOGLE DRIVE: https://docs.google.com/a/prhsrobotics.com/spreadsheets/d/1j2z3Uly7T2C6El34SFLA19RGCt04RwKtTRwmxWzCv3Q/edit?usp=sharing
 # Takes in the area of a contour and calculates the x and y offsets
 def calculateXOffset(area):
-    return max(0, 0.052 * area - 17.496)
+    return max(0, 0.0103009 * area - 17.496)
 def calculateYOffset(area):
-    return min(0, 0.099*area - 81.217)    
+    return min(0, 0.0196113 * area - 81.217)
 
 def main():
     # captureSuccess is true if the camera was read properly
@@ -113,6 +118,9 @@ def main():
 
     bestContour = getBestContour(sortedContours)
 
+    for point in targetingDots:
+        cv2.circle(image, point, 5, (0, 0, 255), cv2.FILLED)
+
     if bestContour != None:
         #x, y = findCenterXY(cnt)
         rect = cv2.minAreaRect(bestContour)
@@ -123,7 +131,8 @@ def main():
         
         # A list of the Box points sorted by lowest y values, to find the top line of the box
         sortedBoxPoints = sorted(box, key = itemgetter(1))
-        
+        boxArea = np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[1]) * np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[2])
+
         box = np.int0(box)
         
         #center of the contour
@@ -132,27 +141,29 @@ def main():
         
         area = cv2.contourArea(bestContour)
         
-        offset = (calculateXOffset(area), calculateYOffset(area))
+        offset = (calculateXOffset(boxArea), calculateYOffset(boxArea))
+        print str(offset[0]) + ',' + str(offset[1]) + ',' + str(boxArea)
         
         targetPoint = tuple(map(int, map(sum, zip(centerPoint, offset))))
+        estimatedShotPoint = tuple(map(int, map(lambda (x, y): x - y, zip((width/2, height/2), offset))))
 
         # Draws the rotated rectangle in blue
         cv2.drawContours(image, [box], 0, (255, 0, 0), 2)
         #draws point in middle of contour in yellow
         cv2.circle(image, centerPoint, 5, (0, 255, 255), cv2.FILLED)
         
-        #draws targetPoint in Orange
-        cv2.circle(image, targetPoint, 5, (0, 180, 255), cv2.FILLED)
+        #draws estimatedShotPoint in Orange
+        cv2.circle(image, estimatedShotPoint, 5, (0, 180, 255), cv2.FILLED)
         
         
 
-        print "(%d, %d)" % targetPoint
+        # print "(%d, %d)" % targetPoint
         sd.putNumber("x", targetPoint[0])
         sd.putNumber("y", targetPoint[1])
         sd.putNumber("area", area)
         sd.putBoolean("contourFound", True)
     else:
-        print "no contours"
+        # print "no contours"
         sd.putBoolean("contourFound", False)
         
     # Center Cirle in Yellow

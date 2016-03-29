@@ -22,6 +22,14 @@ minValue = 60
 maxHue = 100
 maxSaturation = 255
 maxValue = 255
+#updating for ring LED
+
+minHue = 47
+minSaturation = 191
+minValue = 66
+maxHue = 86
+maxSaturation = 255
+maxValue = 167
 
 lowerHSV = np.array([minHue, minSaturation, minValue])
 upperHSV = np.array([maxHue, maxSaturation, maxValue])
