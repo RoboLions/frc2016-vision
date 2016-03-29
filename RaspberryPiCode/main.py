@@ -19,19 +19,20 @@ targetingDots = [(165, 187), (143, 162), (143, 134)]
 
 #Lower and upper bounds for the H, S, V values respectively
 minHue = 55
-minSaturation = 44
+minSaturation = 75
 minValue = 138
 
 maxHue = 92
 maxSaturation = 255
 maxValue = 255
 
+minBoxArea = 650
+
 lowerHSV = np.array([minHue, minSaturation, minValue])
 upperHSV = np.array([maxHue, maxSaturation, maxValue])
 
 # The index of the contours in the tuple returned from the findContours method
 contourIndex = 1
-
 
 # This subproccess runs the command, basically setting the exposure so it's not automatic, drastically reducing the performance.
 subprocess.call(["v4l2-ctl", "-d" ,"/dev/video0", "-c", "exposure_auto=1", "-c", "exposure_absolute=10"]) # exposure_absolute sets the exposure
@@ -41,7 +42,7 @@ subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n v
 if len(sys.argv) < 2:
     print("Error: specify an IP to connect to!")
     print("Going with default: ")
-    ip = "roboRIO-1261-FRC.local"
+    ip = "10.12.61.2"
     print(ip)
 else:
     ip = sys.argv[1]
@@ -72,8 +73,12 @@ def getBestContour(cntrs):
     area = cv2.contourArea(cnt)
     hull = cv2.convexHull(cnt)
     hull_area = cv2.contourArea(hull)
-    
-    if hull_area > 0:
+
+    rect = cv2.minAreaRect(cnt)
+    box = sorted(cv2.boxPoints(rect), key = itemgetter(1))
+    box_area = np.linalg.norm(box[0] - box[1]) * np.linalg.norm(box[0] - box[2])
+
+    if hull_area > 0 and box_area > minBoxArea:
         targetSolidity = 0.35
         solidityTolerance = 0.1
 
@@ -90,9 +95,12 @@ def getBestContour(cntrs):
 # GOT this calcualtions from GOOGLE DRIVE: https://docs.google.com/a/prhsrobotics.com/spreadsheets/d/1j2z3Uly7T2C6El34SFLA19RGCt04RwKtTRwmxWzCv3Q/edit?usp=sharing
 # Takes in the area of a contour and calculates the x and y offsets
 def calculateXOffset(area):
-    return max(0, 0.0103009 * area - 17.496)
+    # return max(0, 0.0103009 * area)
+    return max(0, 0.5 * 0.01545135 * area)
 def calculateYOffset(area):
-    return min(0, 0.0196113 * area - 81.217)
+    # return min(0, 0.0196113 * area - 81.217)
+    # return min(0, 0.00841481 * area - 48.79153378)
+    return min(0, 0.00841481 * area - 63.70994870)
 
 def drawTargetingDots(image):
     for point in targetingDots:
@@ -128,14 +136,22 @@ def main():
         # Box is just a list of points (numpy.ndarray)
         box = cv2.boxPoints(rect)
         
+	
         # A list of the Box points sorted by lowest y values, to find the top line of the box
         sortedBoxPoints = sorted(box, key = itemgetter(1))
         boxArea = np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[1]) * np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[2])
+	
+        dist1 = np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[1])
+        dist2 = np.linalg.norm(sortedBoxPoints[0] - sortedBoxPoints[2])
+
+        if dist1 >= dist2:
+            centerPoint = (sortedBoxPoints[0] + sortedBoxPoints[1]) / 2
+        else:
+	    centerPoint = (sortedBoxPoints[0] + sortedBoxPoints[2]) / 2
 
         box = np.int0(box)
         
         #center of the contour
-        centerPoint = (sortedBoxPoints[0] + sortedBoxPoints[1]) / 2
         centerPoint = tuple(centerPoint)
         
         area = cv2.contourArea(bestContour)
@@ -148,6 +164,7 @@ def main():
 
         # Draws the rotated rectangle in blue
         cv2.drawContours(image, [box], 0, (255, 0, 0), 2)
+        # cv2.drawContours(image, contours, 0, (255, 255, 0), 2) # TODO: remove
         #draws point in middle of contour in yellow
         cv2.circle(image, centerPoint, 5, (0, 255, 255), cv2.FILLED)
         
@@ -157,7 +174,7 @@ def main():
         # print "(%d, %d)" % targetPoint
         sd.putNumber("x", targetPoint[0])
         sd.putNumber("y", targetPoint[1])
-        sd.putNumber("area", area)
+        sd.putNumber("area", boxArea)
         sd.putBoolean("contourFound", True)
     else:
         # print "no contours"
