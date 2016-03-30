@@ -101,9 +101,8 @@ def calculateXOffset(area):
     # return max(0, 0.0103009 * area)
     return max(0, 0.5 * 0.01545135 * area)
 def calculateYOffset(area):
-    # return min(0, 0.0196113 * area - 81.217)
-    # return min(0, 0.00841481 * area - 48.79153378)
-    return min(0, 0.00841481 * area - 63.70994870)
+    # Higher value = lower shot
+    return max(0, 0.00841481 * area + 1)
 
 def drawTargetingDots(image):
     for point in targetingDots:
