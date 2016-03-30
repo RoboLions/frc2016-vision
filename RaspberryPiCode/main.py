@@ -191,7 +191,7 @@ def main():
     # cv2.imshow("Frame", image)
 
     # writes the frames to a file to be read by the mjpeg streamer
-    cv2.imwrite("/home/pi/Desktop/frc2016-vision/RaspberryPiCode/video.jpg", image)
+    cv2.imwrite("./video.jpg", image)
     
 while True:
     main()
