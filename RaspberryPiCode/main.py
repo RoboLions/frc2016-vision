@@ -37,7 +37,10 @@ contourIndex = 1
 # This subproccess runs the command, basically setting the exposure so it's not automatic, drastically reducing the performance.
 subprocess.call(["v4l2-ctl", "-d" ,"/dev/video0", "-c", "exposure_auto=1", "-c", "exposure_absolute=10"]) # exposure_absolute sets the exposure
 # This subprocess runs the command, to run the mjpg streamer for driver station
-subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n video.jpg -r", "-o", "/usr/local/lib/output_http.so -w /usr/local/www -p 1180"])
+#subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n video.jpg -r", "-o", "/usr/local/lib/output_http.so -w /usr/local/www -p 1180"])
+
+# This subprocess runs the command, to run the mjpg streamer for driver station (<3 Chris)
+subprocess.Popen(["mjpg_streamer", "-i", "/usr/local/lib/input_file.so -f . -n video.jpg", "-o", "/usr/local/lib/output_http.so -w /usr/local/www -p 1180"])
 
 if len(sys.argv) < 2:
     print("Error: specify an IP to connect to!")
